@@ -16,7 +16,7 @@ class NeuralNetwork():
 		self.syn0 = 2*np.random.random((self.network_shape[0], self.network_shape[1])) - 1
 		self.syn1 = 2*np.random.random((self.network_shape[1], self.network_shape[2])) - 1
 
-	def train(self, X, y, epochs=60001, visualization_step_size=10000):
+	def train(self, X, y, epochs=60001, visualization_step_size=100):
 		for i in range(0, epochs):
 
 			# forward propogation
@@ -146,14 +146,14 @@ if __name__ == "__main__":
 	y = np.array([
 		[0],
 		[1],
-		[1],
-		[0]])
+		[0],
+		[1]])
 
 	clf = NeuralNetwork(len(X[0]), 4, 1)
 
 	clf.train(X, y)
 	
-	# pred_y = clf.predict([0, 1, 1])
+	pred_y = clf.predict([0, 1, 1])
 
 	# print(pred_y)
 
