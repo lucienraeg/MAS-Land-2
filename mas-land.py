@@ -26,7 +26,7 @@ class Agent:
 
 		self.speed = 0.5 # 0.5
 		self.turn_speed = 0.1 # 0.1
-		self.vision_range = 256
+		self.vision_range = 128
 
 		self.nearby = []
 
@@ -42,8 +42,8 @@ class Agent:
 		self.y += self.speed*sin(theta_rad)
 
 		# clamp position
-		self.x = max(32, min(Display.width-32, self.x))
-		self.y = max(32, min(Display.height-32, self.y))
+		self.x = max(32, min(world_w-32, self.x))
+		self.y = max(32, min(world_h-32, self.y))
 
 	def decide_direction(self):
 		# random wandering
@@ -55,7 +55,19 @@ class Agent:
 		for agent in agents:
 			if point_distance(self.x, self.y, agent.x, agent.y) < self.vision_range and agent != self:
 				if 90 < point_direction(self.x, self.y, agent.x, agent.y, offset=self.angle+180) < 270:
-					self.nearby.append(agent)
+					rel_ang = point_direction(self.x, self.y, agent.x, agent.y, offset=self.angle+270)
+					rel_dist = 1-point_distance(self.x, self.y, agent.x, agent.y) / self.vision_range
+					self.nearby.append(VisionItem(agent, rel_ang, rel_dist))
+
+class VisionItem:
+
+	def __init__(self, obj, angle, distance):
+		self.obj = obj
+		self.ang = angle
+		self.dist = distance
+
+	def __repr__(self):
+		return "VisionItem({}, {}, {})".format(self.obj, self.ang, self.dist)
 
 class Display:
 
@@ -88,7 +100,7 @@ class Display:
 		self.mouse_x, self.mouse_y = pygame.mouse.get_pos()
 
 		self.display_agents()
-		self.display_focus()
+		self.display_focus_info()
 
 		pygame.display.set_caption("FPS: {}".format(round(self.clock.get_fps(),2)))
 
@@ -118,8 +130,11 @@ class Display:
 		if not self.focus == None:
 
 			# connections with nearby agents
-			for other_agent in self.focus.nearby:
-				pygame.draw.line(self.display, c["lt_gray"], (self.focus.x, self.focus.y), (other_agent.x, other_agent.y), 1)
+			for item in self.focus.nearby:
+				other_agent = item.obj
+
+				if type(other_agent) == Agent:
+					pygame.draw.line(self.display, c["lt_gray"], (self.focus.x, self.focus.y), (other_agent.x, other_agent.y), 1)
 
 			# focus rect
 			pygame.draw.rect(self.display, c["red"], (self.focus.x-10, self.focus.y-10, 20, 20), 2)
@@ -129,32 +144,60 @@ class Display:
 			text_rect = text.get_rect(center=(self.focus.x, self.focus.y-18))
 			self.display.blit(text, text_rect)
 
-	def display_focus(self):
+	def display_focus_info(self):
 		c = self.colors
 		f = self.fonts
 
-		if not self.focus == None:
-			fagent = self.focus
-			text = f["large"].render("#{}, x: {}, y: {}, angle: {}°, nearby: {}".format(fagent.index, int(fagent.x), int(fagent.y), int(fagent.angle % 360), [agent.index for agent in fagent.nearby]), True, c["black"])
-			self.display.blit(text, (4, 4))
+		pygame.draw.rect(self.display, c["black"], (900, 0, 200, 720))
 
-			pygame.draw.rect(self.display, c["black"], (4, 24, 182, 16), 2)
-			pygame.draw.rect(self.display, c["red"], (4+90, 24, 1, 16), 2)
+		if not self.focus == None:
+			x1 = world_w
+			y1 = 0
+
+			w, h = 200, 180
+
+			fagent = self.focus
+
+			# general info
+			info_labels = ["index", "pos", "angle", "nearby"]
+			info = [
+			"{}".format(fagent.index), 
+			"{}".format((int(fagent.x), int(fagent.y))), 
+			"{}°".format(int(fagent.angle % 360)), 
+			"{}".format(len(fagent.nearby))]
+
+			for i in range(len(info)):
+				text = f["large"].render(str(info_labels[i]), True, c["gray"])
+				self.display.blit(text, (x1+4, y1+i*16))
+
+				text = f["large"].render(str(info[i]), True, c["white"])
+				self.display.blit(text, (x1+56, y1+i*16))
+
+			# vision repry1 = 64
+			y1 = y1+48
 
 			if len(fagent.nearby):
-				for i, agent in enumerate(fagent.nearby):
-					rel_ang = point_direction(fagent.x, fagent.y, agent.x, agent.y, offset=fagent.angle+270)
-					rel_dist = 1-point_distance(fagent.x, fagent.y, agent.x, agent.y) / agent.vision_range
+				for i, item in enumerate(fagent.nearby[:7]):
+					rel_ang = item.ang
+					rel_dist = item.dist
 
 					col = (int(255*(0.5+rel_dist/2)), 0, 0)
 
-					pygame.draw.circle(self.display, col, (int(4+(rel_ang)), 32), 3)
+					pygame.draw.circle(self.display, col, (4+x1+int(rel_ang), y1+32), 3)
+
+					text = f["large"].render(str(item.obj), True, c["white"])
+					self.display.blit(text, (x1+4, y1+48+i*16))
+
+			pygame.draw.rect(self.display, c["white"], (x1+4, y1+24, 182, 16), 2)
+			pygame.draw.rect(self.display, c["yellow"], (x1+94, y1+21, 1, 22), 2)
 
 
 def initialize_world(debug=True):
 	agents = []
 	for i in range(64):
-		agents.append(Agent(i, random.randint(32, Display.width-32), random.randint(32, Display.height-32)))
+		new_agent = Agent(i, random.randint(32, world_w-32), random.randint(32, world_h-32))
+		new_agent.angle = random.randint(0, 360)
+		agents.append(new_agent)
 
 	print("Created {} agents".format(len(agents)))
 
@@ -167,6 +210,9 @@ def main():
 		agent.move()
 
 if __name__ == "__main__":
+	world_w = 900
+	world_h = 720
+
 	running = True
 
 	# init display and world
