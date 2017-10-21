@@ -1,3 +1,5 @@
-import math
+a = [2, 5, 12]
 
-print(math.atan(60))
+b = [aa for aa in a if aa > 8]
+
+print(b)
